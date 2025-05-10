@@ -1,0 +1,59 @@
+{% extends 'monitor/base.html' %}
+
+{% block title %} Home {% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f4f6f9;
+    }
+
+    .home-card {
+        background-color: #ffffff;
+        padding: 40px 30px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.07);
+        margin-top: 110px;
+        text-align: center;
+    }
+
+    .home-card h2 {
+        font-weight: 600;
+        color: #1a1a33;
+        margin-bottom: 20px;
+    }
+
+    .home-card p {
+        color: #4a4a4a;
+        font-size: 1.1rem;
+    }
+
+    .btn-logout {
+        margin-top: 20px;
+        background-color: #dc3545;
+        border-color: #dc3545;
+        font-weight: 500;
+        padding: 10px 20px;
+        border-radius: 8px;
+    }
+
+    .btn-logout:hover {
+        background-color: #bb2d3b;
+        border-color: #b02a37;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="home-card">
+                <h2>Welcome, {{ request.user.username }}!</h2>
+                <p>Use the sidebar to access and monitor your device data.</p>
+                <a href="{% url 'logout' %}" class="btn btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

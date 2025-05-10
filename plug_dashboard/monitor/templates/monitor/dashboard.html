@@ -1,0 +1,410 @@
+{% extends "monitor/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+    <style>
+        .statbox {
+            background: #f8f9fa;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+
+        canvas {
+            background: #ffffff;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+
+        .chart-canvas {
+            height: 300px !important;
+        }
+
+        .border-box {
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            background-color: #ffffff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease;
+        }
+
+        .border-box:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .border-box h5 {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .border-box p {
+            color: #007bff;
+            margin: 0;
+        }
+
+        .chart-box {
+            min-width: 300px;
+            flex: 1 1 0;
+            padding: 16px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .stat-box {
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb; /* light gray */
+            transition: all 0.3s ease;
+        }
+
+        .stat-box:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+            border-color: #d1d5db;
+        }
+
+        .form-select {
+            width: 250px;
+        }
+
+        .form_control {
+            width: 250px;
+        }
+
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="container py-4">
+        <div class="row g-4 mb-4">
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-box border-box">
+                    <h5>Today Runtime</h5>
+                    <p class="fs-4" id="today_runtime">--</p>
+                </div>
+            </div>
+
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-box border-box">
+                    <h5>Today Energy</h5>
+                    <p class="fs-4" id="today_energy">--</p>
+                </div>
+            </div>
+
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-box border-box">
+                    <h5>Month Runtime</h5>
+                    <p class="fs-4" id="month_runtime">--</p>
+                </div>
+            </div>
+
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-box border-box">
+                    <h5>Month Energy</h5>
+                    <p class="fs-4" id="month_energy">--</p>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4 mb-4 stat-box">
+                <h5>Today Energy (Wh)</h5>
+                <canvas id="energyChart" class="chart-canvas"></canvas>
+            </div>
+            <div class="col-md-4 mb-4 stat-box">
+                <h5>Current Power</h5>
+                <canvas id="powerChart" class="chart-canvas"></canvas>
+            </div>
+            <div class="col-md-4 mb-4 stat-box">
+                <h5>Voltage & Current</h5>
+                <canvas id="voltageCurrentChart" class="chart-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label for="heatmapDays" class="form-label">Select Last no. of days:</label>
+                <select class="form-select" id="heatmapDays" onchange="toggleCustomInput(); drawHeatmaps();">
+                    <option value="1">1 Day</option>
+                    <option value="3">3 Days</option>
+                    <option value="7" selected>7 Days</option>
+                    <option value="14">14 Days</option>
+                    <option value="30">30 Days</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div class="col-md-4" id="customDaysInput" style="display: none;">
+                <label for="customDays" class="form-label">Enter custom days:</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="customDays" min="1" value="7" style="max-width: 250px;">
+                    <button class="btn btn-primary" type="button" onclick="drawHeatmaps()">Apply</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4 mb-4 stat-box flex-fill">
+                <h5>Voltage Heatmap</h5>
+                <div id="voltageHeatmap"></div>
+            </div>
+            <div class="col-md-4 mb-4 stat-box flex-fill">
+                <h5>Current Heatmap</h5>
+                <div id="currentHeatmap"></div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block extra_js %}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+        <script>
+
+            function toggleCustomInput() {
+                const dropdown = document.getElementById('heatmapDays');
+                const customInputDiv = document.getElementById('customDaysInput');
+                if (dropdown.value === 'custom') {
+                    customInputDiv.style.display = 'block';
+                } else {
+                    customInputDiv.style.display = 'none';
+                }
+            }
+            
+            function formatTime(minutes) {
+                const days = Math.floor(minutes / 1440); 
+                const hours = Math.floor((minutes % 1440) / 60);
+                const mins = minutes % 60;
+
+                let formattedTime = '';
+                if (days > 0) {
+                    formattedTime += days + 'd ';
+                }
+                if (hours > 0) {
+                    formattedTime += hours + 'h ';
+                }
+                formattedTime += mins + 'min';
+
+                return formattedTime;
+            }
+
+            async function updateStats() {
+                const res = await fetch('api/latest-reading/');
+                const data = await res.json();
+                document.getElementById('today_runtime').innerText = formatTime(data.today_runtime);
+                document.getElementById('today_energy').innerText = data.today_energy + 'KWh';
+                document.getElementById('month_runtime').innerText = formatTime(data.month_runtime);
+                document.getElementById('month_energy').innerText = data.month_energy + 'KWh';
+            }
+
+            const voltageCurrentChart = new Chart(document.getElementById('voltageCurrentChart'),{
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Voltage (V)',
+                            borderColor: 'blue',
+                            data: [],
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'Current (mA)',
+                            borderColor: 'red',
+                            data: [],
+                            yAxisID: 'y2'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y1: {
+                            type: 'linear',
+                            position: 'left',
+                            
+                        },
+                        y2: {
+                            type: 'linear',
+                            position: 'right',
+                            
+                            grid: { drawnOnChartArea: false}
+                        },
+                        x: {
+                            ticks: {
+                                display: false
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    },
+                    plugins: {
+                        tooltip: {
+                            animation: false
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false
+                    }
+                }
+
+            });
+
+            const powerChart = new Chart(document.getElementById('powerChart'),{
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Current Power (W)',
+                        borderColor: 'orange',
+                        data:[]
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { 
+                        x: {
+                            ticks: {
+                                display: false
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    },
+                    plugins: {
+                        tooltip: {
+                            animation: false
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false
+                    }
+                }
+            });
+
+            const energyChart = new Chart(document.getElementById('energyChart'),{
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Energy (Wh)',
+                        borderColor: 'purple',
+                        data: [],
+                        pointRadius: 0,
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales:{
+                        x: {
+                            ticks: {
+                                display: false
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    },
+                    plugins: {
+                        tooltip: {
+                            animation: false
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false
+                    }
+                }
+            });
+
+            async function updateCharts() {
+                const res = await fetch('api/chart-data/');
+                const data = await res.json();
+
+                const {timestamps1 ,timestamps, voltage, current, current_power, energy_wh} = data;
+
+                voltageCurrentChart.data.labels = timestamps;
+                voltageCurrentChart.data.datasets[0].data = voltage;
+                voltageCurrentChart.data.datasets[1].data = current;
+                voltageCurrentChart.update();
+
+                powerChart.data.labels = timestamps;
+                powerChart.data.datasets[0].data = current_power;
+                powerChart.update();
+
+                energyChart.data.labels = timestamps1;
+                energyChart.data.datasets[0].data = energy_wh;
+                energyChart.update();
+            }
+
+            async function drawHeatmaps() {
+                const selected = document.getElementById("heatmapDays").value;
+
+                let days;
+                if (selected === 'custom') {
+                    days = parseInt(document.getElementById('customDays').value) || 1;
+                } else {
+                    days = parseInt(selected);
+                }
+
+                const res = await fetch(`api/heatmap-data/?days=${days}`);
+                const data = await res.json();
+                
+                const layout = {
+                    margin: { t: 30 },
+                    xaxis: { title: 'Date' },
+                    yaxis: { title: 'Hour' }
+                };
+
+                const voltageHeatmap = [{
+                    z: data.voltage_values,
+                    x: data.x_labels,
+                    y: data.y_labels,
+                    type: 'heatmap',
+                    colorscale: 'YlGnBu',
+                    name: 'Voltage (V)'
+                }];
+
+                const currentHeatmap = [{
+                    z: data.current_values,
+                    x: data.x_labels,
+                    y: data.y_labels,
+                    type: 'heatmap',
+                    colorscale: 'Reds',
+                    name: 'Current (mA)'
+                }];
+
+                Plotly.newPlot('voltageHeatmap', voltageHeatmap, layout);
+                Plotly.newPlot('currentHeatmap', currentHeatmap, layout);
+             }
+
+            updateStats();
+            updateCharts();
+            drawHeatmaps();
+            setInterval(() => {
+                updateStats();
+                updateCharts();
+                drawHeatmaps();
+            },5000);
+        </script>
+{% endblock %}
